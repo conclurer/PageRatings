@@ -1,0 +1,175 @@
+<?php
+
+class PageRatings extends WireData implements Module
+{
+    public static function getModuleInfo()
+    {
+        return array(
+            'title' => __('Ratings'),
+            'summary' => __('Adds Ratings to Pages.'),
+            'version' => '100',
+            'author' => 'Conclurer GbR',
+            'autoload' => true
+        );
+    }
+
+    private static $table = 'pages_ratings';
+
+    public function init()
+    {
+        $this->addHookProperty('Page::votes', $this, 'hookVoteCounts');
+        $this->addHookProperty('Page::averageRating', $this, 'hookAverageRating');
+        $this->addHookProperty('Page::currentRating', $this, 'hookCurrentRating');
+        $this->addHookProperty('Page::hasVoted', $this, 'hookHasVoted');
+        $this->addHook('Page::resetRatings', $this, 'hookResetRatings');
+        $this->addHook('Page::addRating', $this, 'hookAddRating');
+    }
+
+    public function ___install()
+    {
+        $table = self::$table;
+        $this->database->exec("CREATE TABLE IF NOT EXISTS `$table` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `page_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `rating` int(1) NOT NULL,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `page_id` (`page_id`,`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ;");
+    }
+
+    public function ___uninstall()
+    {
+        $table = self::$table;
+        $this->database->exec("DROP TABLE `$table`;");
+    }
+
+    public function hookVoteCounts(HookEvent $event)
+    {
+        $page = $event->object;
+        $table = self::$table;
+
+        $statement = $this->database->prepare("SELECT COUNT(rating) as summary FROM $table WHERE page_id = ?");
+        $result = $statement->execute(array(
+            $page->id
+        ));
+
+        if (!$result) {
+            $event->return = 0;
+            return;
+        }
+
+        while (($set = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+            $event->return = $set ['summary'];
+            return;
+        }
+
+        $event->return = 0;
+    }
+
+    public function hookAverageRating(HookEvent $event)
+    {
+        $page = $event->object;
+        $table = self::$table;
+
+        $statement = $this->database->prepare("SELECT AVG(rating) as average FROM $table WHERE page_id = ?");
+        $result = $statement->execute(array(
+            $page->id
+        ));
+
+        if (!$result) {
+            $event->return = 0;
+            return;
+        }
+
+        while (($set = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+            $event->return = floatval($set ['average']);
+            return;
+        }
+
+        $event->return = 0;
+    }
+
+    public function hookCurrentRating(HookEvent $event)
+    {
+        $page = $event->object;
+
+        $event->return = $this->getCurrentUserRatingForPage($page->id);
+    }
+
+    protected function getCurrentUserRatingForPage($page_id)
+    {
+        if ($this->session->get("rating_$page_id") != null)
+            return $this->session->get("rating_$page_id");
+
+        // Not in session, abort if user is guest
+        if ($this->user->isGuest())
+            return 0;
+
+        // Look in Database
+        $table = self::$table;
+        $statement = $this->database->prepare("SELECT rating FROM $table WHERE page_id = ? AND user_id = ? LIMIT 1");
+        $result = $statement->execute(array(
+            $page_id,
+            $this->user->id
+        ));
+
+        if (!$result) {
+            return 0;
+        }
+
+        while (($set = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+            $this->session->set("rating_$page_id", $set['rating']);
+            return $set ['rating'];
+        }
+
+        return 0;
+    }
+
+    public function hookHasVoted(HookEvent $event)
+    {
+        $page = $event->object;
+
+        $event->return = ($this->getCurrentUserRatingForPage($page->id) != 0);
+    }
+
+    public function hookResetRatings(HookEvent $event)
+    {
+        $page = $event->object;
+        $table = self::$table;
+
+        $statement = $this->database->prepare("DELETE FROM $table WHERE page_id = ?");
+
+        $event->return = $statement->execute(array($page->id));
+    }
+
+    public function hookAddRating(HookEvent $event)
+    {
+        $page = $event->object;
+        $rating = $event->arguments [0];
+
+        if ($rating < 1 || $rating > 5) {
+            $event->return = false;
+            return;
+        }
+
+        if ($this->getCurrentUserRatingForPage($page->id) == 0) {
+            $table = self::$table;
+            $currentDate = new DateTime ();
+            $statement = $this->database->prepare("INSERT INTO $table (page_id, user_id, rating, created_at) VALUES (?,?,?,?)");
+            $statement->execute(array(
+                $page->id,
+                $this->user->id,
+                $rating,
+                $currentDate->format('Y-m-d H:i:s')
+            ));
+            $this->session->set("rating_{$page->id}", $rating);
+
+            $event->return = true;
+            return;
+        }
+
+        $event->return = false;
+    }
+}

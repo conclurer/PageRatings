@@ -1,0 +1,12 @@
+{
+    "file": "site\\modules\\PageRatings\\PageRatings.module",
+    "textdomain": "site--modules--pageratings--pageratings-module",
+    "translations": {
+        "e8dcd33ae274522f351c266f028eed7b": {
+            "text": "Bewertungen"
+        },
+        "3e6a30f012659d2cb2324817e3f3b2f3": {
+            "text": "F\u00fcgt Bewertungen zu Seiten hinzu."
+        }
+    }
+}
