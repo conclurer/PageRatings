@@ -1,44 +1,20 @@
 # Page Ratings
 
-This module for [ProcessWire](http://processwire.com) provides a simple API for storing user ratings for pages.
+This module for provides a simple API for storing user ratings for pages.
 
-### Methods for $page
+### Ratings API
 
-```php
-$page->votes	// => 5
-```
+You can access the Ratings API via the `$page->ratings` property.
 
-Returns the amount of votes for this page.
+This includes the following methods:
 
-```php
-$page->averageRating	// => 4.3
-```
+- `$page->ratings->count` the amount of votes on this page
+- `$page->ratings->average` the average of all votes on this page
+- `$page->ratings->current` the current user's rating on this page, `0` if the user hasn't rated this page yet
+- `$page->ratings->hasVoted` returns `true` if the current user has already voted on this page
+- `$page->ratings->reset()` will reset all ratings
+- `$page->ratings->add($rating)` will add an rating from the current user on this page. The rating must be an integer between 1 and 5.
 
-Returns the average of all ratings for this page.
-
-```php
-$page->currentRating	// => 4
-```
-
-Returns the current user's rating for this page.
-
-```php
-$page->hasVoted		// => true
-```
-
-Returns `true` if the current user has rated this page.
-
-```php
-$page->resetRatings()
-```
-
-Deletes all ratings for this page.
-
-```php
-$page->addRating(4)
-```
-
-Adds the current user's rating to this page. The rating must be between 1 and 5.
 
 ### Translation
 
